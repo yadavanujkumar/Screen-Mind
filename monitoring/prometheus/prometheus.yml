@@ -1,0 +1,83 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: screenmind
+    env: production
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "api-gateway"
+    static_configs:
+      - targets: ["api-gateway:8000"]
+    metrics_path: "/metrics"
+
+  - job_name: "auth"
+    static_configs:
+      - targets: ["auth:8001"]
+    metrics_path: "/metrics"
+
+  - job_name: "screen-capture"
+    static_configs:
+      - targets: ["screen-capture:8002"]
+    metrics_path: "/metrics"
+
+  - job_name: "vision"
+    static_configs:
+      - targets: ["vision:8003"]
+    metrics_path: "/metrics"
+
+  - job_name: "state-builder"
+    static_configs:
+      - targets: ["state-builder:8004"]
+    metrics_path: "/metrics"
+
+  - job_name: "llm-reasoning"
+    static_configs:
+      - targets: ["llm-reasoning:8005"]
+    metrics_path: "/metrics"
+
+  - job_name: "task-planner"
+    static_configs:
+      - targets: ["task-planner:8006"]
+    metrics_path: "/metrics"
+
+  - job_name: "action-execution"
+    static_configs:
+      - targets: ["action-execution:8007"]
+    metrics_path: "/metrics"
+
+  - job_name: "memory"
+    static_configs:
+      - targets: ["memory:8008"]
+    metrics_path: "/metrics"
+
+  - job_name: "verification"
+    static_configs:
+      - targets: ["verification:8009"]
+    metrics_path: "/metrics"
+
+  - job_name: "observability"
+    static_configs:
+      - targets: ["observability:8010"]
+    metrics_path: "/metrics"
+
+  - job_name: "explainability"
+    static_configs:
+      - targets: ["explainability:8011"]
+    metrics_path: "/metrics"
+
+  - job_name: "task-queue"
+    static_configs:
+      - targets: ["task-queue:8012"]
+    metrics_path: "/metrics"

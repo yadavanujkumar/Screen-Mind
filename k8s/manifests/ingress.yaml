@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: screenmind-ingress
+  namespace: screen-mind
+  labels:
+    app.kubernetes.io/name: screen-mind
+    app.kubernetes.io/component: ingress
+  annotations:
+    # cert-manager: automatically provision and renew TLS certificates
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # NGINX ingress controller settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.screenmind.example.com
+      secretName: api-screenmind-tls
+    - hosts:
+        - app.screenmind.example.com
+      secretName: app-screenmind-tls
+  rules:
+    - host: api.screenmind.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+    - host: app.screenmind.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8501

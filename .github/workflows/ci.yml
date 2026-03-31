@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "copilot/*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install core dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            pydantic==2.10.3 \
+            pydantic-settings==2.6.1 \
+            httpx==0.27.2 \
+            fastapi==0.115.5 \
+            asyncpg==0.30.0 \
+            prometheus-client==0.21.0 \
+            Pillow==12.1.1
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        env:
+          PYTHONPATH: .
+        run: pytest tests/ -v --tb=short
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run ruff
+        run: |
+          pip install ruff==0.8.6
+          ruff check services/ agent/ shared/ tests/ --ignore E501,F401,F811

@@ -1,0 +1,10 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+easyocr==1.7.2
+Pillow==12.1.1
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+torch==2.6.0
+torchvision==0.21.0
+prometheus-client==0.21.0
+pydantic==2.10.3
