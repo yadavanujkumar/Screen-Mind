@@ -4,6 +4,7 @@ Handles user registration, API key issuance, validation, and rotation.
 """
 
 import hashlib
+import hmac
 import logging
 import secrets
 from contextlib import asynccontextmanager
@@ -28,6 +29,8 @@ logger = logging.getLogger("auth-service")
 
 class Settings(BaseSettings):
     database_url: str = "postgresql://screenmind:screenmind@localhost:5432/screenmind"
+    # Server-side secret used when hashing API keys (set via env var in production)
+    api_key_secret: str = "change-me-in-production"
 
     class Config:
         env_file = ".env"
@@ -101,7 +104,17 @@ app = FastAPI(
 
 
 def _hash_key(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode()).hexdigest()
+    """HMAC-SHA256 of the API key using the server-side secret.
+
+    API keys are high-entropy random tokens (256 bits), so a fast HMAC is
+    appropriate here. The server-side secret prevents offline brute-force even
+    if the database is compromised.
+    """
+    return hmac.new(
+        settings.api_key_secret.encode(),
+        api_key.encode(),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def _generate_api_key() -> str:

@@ -6,6 +6,7 @@ routing, observability, and WebSocket live updates.
 
 import asyncio
 import hashlib
+import hmac
 import logging
 import os
 import time
@@ -67,6 +68,8 @@ class Settings(BaseSettings):
     jaeger_port: int = 6831
     rate_limit: str = "100/minute"
     cors_origins: list[str] = ["*"]
+    # Server-side secret used when hashing API keys (set via env var in production)
+    api_key_secret: str = "change-me-in-production"
 
     class Config:
         env_file = ".env"
@@ -191,7 +194,17 @@ async def prometheus_middleware(request: Request, call_next: Any) -> Response:
 
 
 def _hash_api_key(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode()).hexdigest()
+    """HMAC-SHA256 of the API key using the server-side secret.
+
+    API keys are high-entropy random tokens (256 bits), so a fast HMAC is
+    appropriate here. The server-side secret prevents offline brute-force even
+    if the database is compromised.
+    """
+    return hmac.new(
+        settings.api_key_secret.encode(),
+        api_key.encode(),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 async def authenticate(request: Request) -> dict:
