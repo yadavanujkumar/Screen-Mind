@@ -87,6 +87,7 @@ services:
       OBSERVABILITY_URL: http://observability:8010
       EXPLAINABILITY_URL: http://explainability:8011
       TASK_QUEUE_URL: http://task-queue:8012
+      CONVERSATION_URL: http://conversation:8013
     depends_on:
       postgres:
         condition: service_healthy
@@ -243,6 +244,25 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - screenmind-network
+
+  conversation:
+    build: ./services/conversation
+    restart: unless-stopped
+    ports:
+      - "8013:8013"
+    environment:
+      <<: *common-env
+      LLM_REASONING_URL: http://llm-reasoning:8005
+      TASK_PLANNER_URL: http://task-planner:8006
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    depends_on:
+      - task-planner
     networks:
       - screenmind-network
 
