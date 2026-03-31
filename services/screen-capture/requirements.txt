@@ -1,0 +1,6 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+mss==9.0.2
+Pillow==11.0.0
+prometheus-client==0.21.0
+pydantic==2.10.3
