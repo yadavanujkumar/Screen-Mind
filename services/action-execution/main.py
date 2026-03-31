@@ -263,14 +263,16 @@ async def execute_action(action: ActionPayload, task_id: str) -> str:
                 status_code=403,
                 detail=f"Application '{action.app_name}' is not in ALLOWED_APP_NAMES",
             )
-        # Pass as a list to avoid shell interpretation; no shell=True
+        # Retrieve the pre-validated name from the allowlist (avoids taint from user input)
+        validated_app = next(n for n in ALLOWED_APP_NAMES if n == action.app_name)
+        # Pass as a single-element list with shell=False to prevent shell interpretation
         proc = subprocess.Popen(
-            [action.app_name],
+            [validated_app],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             shell=False,
         )
-        return f"Launched application '{action.app_name}' (pid={proc.pid})"
+        return f"Launched application '{validated_app}' (pid={proc.pid})"
 
     elif a == "OPEN_WEBSITE":
         url = validate_url(action.url)
@@ -352,19 +354,20 @@ async def execute(req: ExecuteRequest):
 
     start = time.perf_counter()
     success = False
-    message = ""
+    success_message = ""
+    db_log_message = ""
     try:
-        message = await execute_action(req.action, req.task_id)
+        success_message = await execute_action(req.action, req.task_id)
+        db_log_message = success_message
         success = True
         ACTIONS_TOTAL.labels(action_type=action_type, status="success").inc()
     except HTTPException:
         ACTIONS_TOTAL.labels(action_type=action_type, status="rejected").inc()
         raise
     except Exception as exc:
-        internal_message = f"Execution error: {exc}"
-        # Log full details server-side; expose only a generic message to callers
+        # Log full exception server-side only; never forward to the caller
         logger.error("Action %s failed for task_id=%s: %s", action_type, req.task_id, exc)
-        message = internal_message
+        db_log_message = f"Execution error: {type(exc).__name__}"
         ACTIONS_TOTAL.labels(action_type=action_type, status="error").inc()
     finally:
         elapsed = time.perf_counter() - start
@@ -378,16 +381,16 @@ async def execute(req: ExecuteRequest):
             action_type,
             req.action.model_dump(exclude_none=True),
             success,
-            message,
+            db_log_message,
         )
 
     if not success:
         raise HTTPException(status_code=500, detail="Action execution failed. See server logs for details.")
 
     return {
-        "success": success,
+        "success": True,
         "action_type": action_type,
-        "message": message,
+        "message": success_message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
