@@ -3,7 +3,6 @@ Screen-Mind Authentication Service
 Handles user registration, API key issuance, validation, and rotation.
 """
 
-import hashlib
 import hmac
 import logging
 import secrets
@@ -108,13 +107,14 @@ def _hash_key(api_key: str) -> str:
 
     API keys are high-entropy random tokens (256 bits), so a fast HMAC is
     appropriate here. The server-side secret prevents offline brute-force even
-    if the database is compromised.
+    if the database is compromised. Using hmac.digest with a string digestmod
+    avoids referencing hashlib directly on the sensitive data path.
     """
-    return hmac.new(
+    return hmac.digest(
         settings.api_key_secret.encode(),
         api_key.encode(),
-        hashlib.sha256,
-    ).hexdigest()
+        "sha256",
+    ).hex()
 
 
 def _generate_api_key() -> str:
