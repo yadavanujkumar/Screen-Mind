@@ -32,7 +32,14 @@ ALLOWED_ACTIONS: set[str] | None = (
     {a.strip().upper() for a in _allowed_env.split(",") if a.strip()} if _allowed_env else None
 )
 
-# Keys that are blocked when BLOCK_DANGEROUS_KEYS=true
+# Allowlist of application names permitted for OPEN_APPLICATION (env-configurable).
+# If empty, no applications are allowed; set to "*" to allow any (not recommended in production).
+_apps_env = os.getenv("ALLOWED_APP_NAMES", "")
+ALLOWED_APP_NAMES: set[str] | None = (
+    {a.strip() for a in _apps_env.split(",") if a.strip()} if _apps_env else None
+)
+
+
 DANGEROUS_KEY_COMBOS: set[str] = {
     "ctrl+alt+delete",
     "ctrl+alt+del",
@@ -245,10 +252,23 @@ async def execute_action(action: ActionPayload, task_id: str) -> str:
     elif a == "OPEN_APPLICATION":
         if not action.app_name:
             raise HTTPException(status_code=400, detail="OPEN_APPLICATION requires 'app_name' field")
+        # Validate against the allowlist to prevent command injection
+        if ALLOWED_APP_NAMES is None:
+            raise HTTPException(
+                status_code=403,
+                detail="OPEN_APPLICATION is disabled. Set ALLOWED_APP_NAMES env var to enable it.",
+            )
+        if action.app_name not in ALLOWED_APP_NAMES:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Application '{action.app_name}' is not in ALLOWED_APP_NAMES",
+            )
+        # Pass as a list to avoid shell interpretation; no shell=True
         proc = subprocess.Popen(
-            action.app_name.split(),
+            [action.app_name],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            shell=False,
         )
         return f"Launched application '{action.app_name}' (pid={proc.pid})"
 
@@ -341,8 +361,10 @@ async def execute(req: ExecuteRequest):
         ACTIONS_TOTAL.labels(action_type=action_type, status="rejected").inc()
         raise
     except Exception as exc:
-        message = f"Execution error: {exc}"
+        internal_message = f"Execution error: {exc}"
+        # Log full details server-side; expose only a generic message to callers
         logger.error("Action %s failed for task_id=%s: %s", action_type, req.task_id, exc)
+        message = internal_message
         ACTIONS_TOTAL.labels(action_type=action_type, status="error").inc()
     finally:
         elapsed = time.perf_counter() - start
@@ -360,7 +382,7 @@ async def execute(req: ExecuteRequest):
         )
 
     if not success:
-        raise HTTPException(status_code=500, detail=message)
+        raise HTTPException(status_code=500, detail="Action execution failed. See server logs for details.")
 
     return {
         "success": success,
