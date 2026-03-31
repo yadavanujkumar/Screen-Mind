@@ -39,6 +39,10 @@ if "selected_task_id" not in st.session_state:
     st.session_state.selected_task_id = ""
 if "submitted_task_id" not in st.session_state:
     st.session_state.submitted_task_id = None
+if "conversation_session_id" not in st.session_state:
+    st.session_state.conversation_session_id = None
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
 
 # ---------------------------------------------------------------------------
 # API helpers
@@ -126,7 +130,7 @@ with st.sidebar:
 # Main tabs
 # ---------------------------------------------------------------------------
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
         "➕ New Task",
         "🔄 Running Tasks",
@@ -134,6 +138,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         "📊 System Metrics",
         "🧠 Memory Browser",
         "🖥️ Live Screen",
+        "💬 Chat",
     ]
 )
 
@@ -565,3 +570,138 @@ with tab6:
     if auto_screen:
         time.sleep(3)
         st.rerun()
+
+# ===========================================================================
+# TAB 7 – Chat (Conversational Control)
+# ===========================================================================
+
+with tab7:
+    st.header("💬 Chat with Screen-Mind")
+    st.markdown(
+        "Converse with the agent in natural language. "
+        "Give it directions to perform tasks remotely, ask questions, or get status updates."
+    )
+
+    # ── Session management ──────────────────────────────────────────────────
+    col_session, col_new = st.columns([3, 1])
+    with col_session:
+        if st.session_state.conversation_session_id:
+            st.info(f"Active session: `{st.session_state.conversation_session_id}`")
+        else:
+            st.warning("No active session. Start one below.")
+    with col_new:
+        if st.button("🆕 New Session", use_container_width=True):
+            if not st.session_state.api_key:
+                st.warning("Enter your API key in the sidebar first.")
+            else:
+                with st.spinner("Starting session…"):
+                    result = api_post(
+                        "/api/v1/conversations",
+                        {"user_id": st.session_state.api_key[:8] or "anonymous"},
+                    )
+                if result:
+                    st.session_state.conversation_session_id = result.get("session_id")
+                    st.session_state.chat_messages = []
+                    st.success(f"✅ Session started: `{result.get('session_id')}`")
+                    st.rerun()
+
+    st.divider()
+
+    # ── Chat history ────────────────────────────────────────────────────────
+    chat_container = st.container()
+    with chat_container:
+        for msg in st.session_state.chat_messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            intent = msg.get("intent")
+            task_id = msg.get("task_id")
+
+            if role == "user":
+                with st.chat_message("user"):
+                    st.write(content)
+                    if intent == "direction":
+                        st.caption("🎯 Detected as a direction")
+                    if task_id:
+                        st.caption(f"✅ Task created: `{task_id}`")
+            else:
+                with st.chat_message("assistant", avatar="🖥️"):
+                    st.write(content)
+
+    # ── Input area ──────────────────────────────────────────────────────────
+    if st.session_state.conversation_session_id:
+        user_input = st.chat_input("Type your message or give a direction…")
+
+        if user_input:
+            session_id = st.session_state.conversation_session_id
+
+            # Optimistically show user message
+            st.session_state.chat_messages.append(
+                {"role": "user", "content": user_input, "intent": None, "task_id": None}
+            )
+
+            with st.spinner("Thinking…"):
+                msg_result = api_post(
+                    f"/api/v1/conversations/{session_id}/messages",
+                    {"content": user_input},
+                )
+
+            if msg_result:
+                intent = msg_result.get("intent", "question")
+                reply = msg_result.get("reply", "")
+                requires_execution = msg_result.get("requires_execution", False)
+
+                # Update intent on the user message
+                if st.session_state.chat_messages:
+                    st.session_state.chat_messages[-1]["intent"] = intent
+
+                # Add assistant reply
+                st.session_state.chat_messages.append(
+                    {"role": "assistant", "content": reply, "intent": intent, "task_id": None}
+                )
+
+                # Auto-execute if the agent detected a direction
+                if requires_execution and intent == "direction":
+                    with st.spinner("Executing direction as remote task…"):
+                        exec_result = api_post(
+                            f"/api/v1/conversations/{session_id}/execute",
+                            {},
+                        )
+
+                    if exec_result:
+                        task_id = exec_result.get("task_id", "")
+                        # Attach task_id to the user message
+                        if st.session_state.chat_messages:
+                            for m in reversed(st.session_state.chat_messages):
+                                if m["role"] == "user" and m["task_id"] is None:
+                                    m["task_id"] = task_id
+                                    break
+                        st.success(f"🚀 Task created: `{task_id}`")
+                        st.session_state.submitted_task_id = task_id
+
+                st.rerun()
+            else:
+                # Remove the optimistically added user message on error
+                st.session_state.chat_messages.pop()
+
+        # ── Manual execute button ───────────────────────────────────────────
+        if st.session_state.chat_messages:
+            st.divider()
+            col_exec, col_clear = st.columns([2, 1])
+            with col_exec:
+                if st.button("🚀 Execute Latest Direction as Task", use_container_width=True):
+                    session_id = st.session_state.conversation_session_id
+                    with st.spinner("Creating task…"):
+                        exec_result = api_post(
+                            f"/api/v1/conversations/{session_id}/execute",
+                            {},
+                        )
+                    if exec_result:
+                        task_id = exec_result.get("task_id", "")
+                        st.success(f"✅ Task created: `{task_id}`")
+                        st.session_state.submitted_task_id = task_id
+            with col_clear:
+                if st.button("🗑️ Clear History", use_container_width=True):
+                    st.session_state.chat_messages = []
+                    st.rerun()
+    else:
+        st.info("Start a new session above to begin chatting with Screen-Mind.")

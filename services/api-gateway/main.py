@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     observability_url: str = "http://localhost:8007"
     memory_url: str = "http://localhost:8006"
     agent_orchestrator_url: str = "http://localhost:8003"
+    conversation_url: str = "http://localhost:8013"
     jaeger_host: str = "localhost"
     jaeger_port: int = 6831
     rate_limit: str = "100/minute"
@@ -392,6 +393,52 @@ async def get_memory(
     _user: dict = Depends(authenticate),
 ) -> JSONResponse:
     return await _proxy(request, settings.memory_url, "/memory")
+
+
+# --- Conversations ----------------------------------------------------------
+
+
+@app.post("/api/v1/conversations", tags=["conversations"])
+@limiter.limit(settings.rate_limit)
+async def create_conversation(
+    request: Request,
+    _user: dict = Depends(authenticate),
+) -> JSONResponse:
+    """Start a new conversation session."""
+    return await _proxy(request, settings.conversation_url, "/sessions")
+
+
+@app.get("/api/v1/conversations/{session_id}", tags=["conversations"])
+@limiter.limit(settings.rate_limit)
+async def get_conversation(
+    session_id: str,
+    request: Request,
+    _user: dict = Depends(authenticate),
+) -> JSONResponse:
+    """Get conversation session info and message history."""
+    return await _proxy(request, settings.conversation_url, f"/sessions/{session_id}")
+
+
+@app.post("/api/v1/conversations/{session_id}/messages", tags=["conversations"])
+@limiter.limit(settings.rate_limit)
+async def send_conversation_message(
+    session_id: str,
+    request: Request,
+    _user: dict = Depends(authenticate),
+) -> JSONResponse:
+    """Send a message to the conversation session and receive a reply."""
+    return await _proxy(request, settings.conversation_url, f"/sessions/{session_id}/messages")
+
+
+@app.post("/api/v1/conversations/{session_id}/execute", tags=["conversations"])
+@limiter.limit(settings.rate_limit)
+async def execute_conversation_direction(
+    session_id: str,
+    request: Request,
+    _user: dict = Depends(authenticate),
+) -> JSONResponse:
+    """Execute the latest direction from the conversation as a remote task."""
+    return await _proxy(request, settings.conversation_url, f"/sessions/{session_id}/execute")
 
 
 # ---------------------------------------------------------------------------
