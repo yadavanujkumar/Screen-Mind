@@ -294,7 +294,8 @@ async def health():
             await conn.fetchval("SELECT 1")
         db_status = "ok"
     except Exception as exc:
-        db_status = f"error: {exc}"
+        logger.error("DB health check failed: %s", exc)
+        db_status = "error: database unreachable"
 
     return {
         "status": "ok",
