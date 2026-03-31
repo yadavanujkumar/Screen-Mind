@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: screenmind-config
+  namespace: screen-mind
+  labels:
+    app.kubernetes.io/name: screen-mind
+    app.kubernetes.io/component: config
+data:
+  # Internal service URLs (cluster-DNS)
+  AUTH_URL: "http://auth:8001"
+  SCREEN_CAPTURE_URL: "http://screen-capture:8002"
+  VISION_URL: "http://vision:8003"
+  STATE_BUILDER_URL: "http://state-builder:8004"
+  LLM_REASONING_URL: "http://llm-reasoning:8005"
+  TASK_PLANNER_URL: "http://task-planner:8006"
+  ACTION_EXECUTION_URL: "http://action-execution:8007"
+  MEMORY_URL: "http://memory:8008"
+  VERIFICATION_URL: "http://verification:8009"
+  OBSERVABILITY_URL: "http://observability:8010"
+  EXPLAINABILITY_URL: "http://explainability:8011"
+  TASK_QUEUE_URL: "http://task-queue:8012"
+
+  # Database (non-secret portion)
+  DATABASE_HOST: "postgres"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "screenmind"
+  DATABASE_USER: "screenmind"
+
+  # Redis (non-secret portion)
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  # LLM defaults
+  OPENAI_MODEL: "gpt-4o"
+  LLM_PROVIDER: "openai"
+  OLLAMA_URL: "http://ollama:11434"
+  OLLAMA_MODEL: "llama3.2"
+
+  # Safety
+  SAFE_MODE: "false"
+  BLOCK_DANGEROUS_KEYS: "true"
+
+  # Monitoring
+  ELASTICSEARCH_URL: "http://elasticsearch:9200"
+  JAEGER_HOST: "jaeger"
+  JAEGER_PORT: "6831"
+  FAISS_INDEX_PATH: "/data/faiss.index"
