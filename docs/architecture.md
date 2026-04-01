@@ -103,8 +103,38 @@ The loop repeats up to `max_steps` (default 50) iterations, terminating early wh
 | Redis (aioredis) | Task queue, plan cache, future pub/sub |
 | FAISS (in-process) | Vector similarity search within the Memory service |
 | WebSocket (FastAPI) | Live task status streaming via the API Gateway |
+| Slack Events API | Remote chat ingestion via Slack Adapter and Conversation service |
 | Prometheus scrape | Metrics collection from `/metrics` endpoints |
 | OpenTelemetry / Jaeger | Distributed tracing (spans emitted by the API Gateway) |
+
+---
+
+## Remote Chat (Slack) Architecture
+
+```
+Slack User Message
+      │
+      ▼
+Slack Events API ──▶ Slack Adapter :8014
+                          │
+                          ├─ verify Slack signature (HMAC-SHA256)
+                          ├─ map channel -> conversation session
+                          ▼
+                 Conversation Service :8013
+                          │
+                          ├─ classify intent (question/direction/clarification)
+                          └─ optionally execute direction as task
+                          ▼
+                    Task Planner :8006
+                          │
+                          ▼
+                    Agent Loop Services
+                          │
+                          ▼
+             Slack Adapter posts reply back to channel
+```
+
+The Slack adapter is stateless except for an in-memory channel-to-session map used to keep conversation context per Slack channel. For production multi-replica deployments, move this mapping to Redis to preserve sticky sessions across instances.
 
 ---
 

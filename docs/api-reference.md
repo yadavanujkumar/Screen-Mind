@@ -15,8 +15,10 @@ Internal service endpoints (ports 8001–8012) are documented here for developer
 5. [Action Execution (:8007)](#action-execution-8007)
 6. [Memory (:8008)](#memory-service-8008)
 7. [Explainability (:8011)](#explainability-service-8011)
-8. [Screen Capture (:8002)](#screen-capture-8002)
-9. [Common Responses](#common-responses)
+8. [Conversation Service (:8013)](#conversation-service-8013)
+9. [Slack Adapter (:8014)](#slack-adapter-8014)
+10. [Screen Capture (:8002)](#screen-capture-8002)
+11. [Common Responses](#common-responses)
 
 ---
 
@@ -883,6 +885,125 @@ Return the full explainability report for a task — all steps with their decisi
     }
   ],
   "total_steps": 1
+}
+```
+
+---
+
+## Conversation Service (:8013)
+
+Base URL: `http://localhost:8013`
+
+### POST /sessions
+
+Create a conversation session.
+
+**Request Body**
+```json
+{
+  "user_id": "slack:T123:U456",
+  "title": "Slack channel C123"
+}
+```
+
+**Response 201**
+```json
+{
+  "session_id": "d4c8f2c1-aaaa-bbbb-cccc-57e99b62e95d",
+  "user_id": "slack:T123:U456",
+  "title": "Slack channel C123",
+  "created_at": "2026-04-01T02:00:00Z",
+  "message_count": 0
+}
+```
+
+### POST /sessions/{session_id}/messages
+
+Append a user message and receive classified assistant response.
+
+**Request Body**
+```json
+{
+  "role": "user",
+  "content": "open chrome and search weather in london"
+}
+```
+
+**Response 200**
+```json
+{
+  "session_id": "d4c8f2c1-aaaa-bbbb-cccc-57e99b62e95d",
+  "reply": "I'll execute that for you: open chrome and search weather in london",
+  "intent": "direction",
+  "task_description": "open chrome and search weather in london",
+  "requires_execution": true,
+  "message_index": 3,
+  "latency_ms": 89.24
+}
+```
+
+### POST /sessions/{session_id}/execute
+
+Execute the latest direction in the session by creating a task in Task Planner.
+
+**Response 200**
+```json
+{
+  "session_id": "d4c8f2c1-aaaa-bbbb-cccc-57e99b62e95d",
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
+  "task_description": "open chrome and search weather in london",
+  "task": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "PENDING"
+  }
+}
+```
+
+---
+
+## Slack Adapter (:8014)
+
+Base URL: `http://localhost:8014`
+
+The Slack adapter receives Slack Events API requests, verifies signatures (`X-Slack-Signature` + `X-Slack-Request-Timestamp`), forwards incoming messages to the Conversation service, and posts replies back to Slack.
+
+### POST /slack/events
+
+Slack Events API endpoint.
+
+#### URL Verification Request
+```json
+{
+  "type": "url_verification",
+  "challenge": "sample_challenge"
+}
+```
+
+**Response 200**
+```json
+{
+  "challenge": "sample_challenge"
+}
+```
+
+#### Message Event Request
+```json
+{
+  "type": "event_callback",
+  "team_id": "T123",
+  "event": {
+    "type": "message",
+    "channel": "C123",
+    "user": "U123",
+    "text": "open chrome"
+  }
+}
+```
+
+**Response 200**
+```json
+{
+  "ok": true
 }
 ```
 

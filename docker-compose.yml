@@ -266,6 +266,21 @@ services:
     networks:
       - screenmind-network
 
+  slack-adapter:
+    build: ./services/slack_adapter
+    restart: unless-stopped
+    ports:
+      - "8014:8014"
+    environment:
+      CONVERSATION_URL: http://conversation:8013
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      AUTO_EXECUTE_DIRECTIONS: ${AUTO_EXECUTE_DIRECTIONS:-true}
+    depends_on:
+      - conversation
+    networks:
+      - screenmind-network
+
   frontend:
     build: ./frontend
     restart: unless-stopped
