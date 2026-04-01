@@ -54,6 +54,8 @@ The agent follows a continuous **Observe → Understand → Reason → Plan → 
 | Observability | 8010 | Prometheus metrics aggregation, structured log ingestion, step timing |
 | Explainability | 8011 | Per-step decision rationale, confidence scores, alternative action logging |
 | Task Queue | 8012 | Priority task queue backed by Redis |
+| Conversation | 8013 | Session-based natural language chat with intent detection and task triggering |
+| Slack Adapter | 8014 | Slack Events API bridge that forwards chat messages to Conversation service |
 | Frontend | 8501 | Streamlit dashboard — live task monitoring, action history, memory browser |
 
 ## Tech Stack
@@ -105,7 +107,7 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-All 13 microservices, PostgreSQL, Redis, Prometheus, Grafana, and the ELK stack start automatically.
+All microservices, PostgreSQL, Redis, Prometheus, Grafana, and the ELK stack start automatically.
 
 ### 3. Initialize the Database
 
@@ -126,6 +128,24 @@ The response includes a plaintext `api_key` — **store it securely, it is shown
 ### 5. Access the Dashboard
 
 Open **http://localhost:8501** in your browser to reach the Streamlit operator dashboard.
+
+### 6. Enable Remote Slack Chat Control
+
+1. Create a Slack app with a bot user and enable **Event Subscriptions**.
+2. In your `.env`, set:
+   - `SLACK_BOT_TOKEN`
+   - `SLACK_SIGNING_SECRET`
+3. Point Slack Events Request URL to:
+   - `https://<your-public-domain>/slack/events`
+   - For local testing, use a tunnel (for example ngrok) to your `8014` port.
+4. Subscribe to bot event `message.channels`.
+5. Invite the bot to your channel and send instructions (for example: `open chrome and search for weather`).
+
+The Slack adapter forwards messages to the Conversation service and posts replies back to Slack. Direction messages can automatically trigger task execution when `AUTO_EXECUTE_DIRECTIONS=true`.
+
+#### Working Screenshot
+
+![Slack adapter health endpoint](https://github.com/user-attachments/assets/747c4c0c-873d-4ee6-925b-c4a39af96389)
 
 ## API Reference
 
@@ -310,6 +330,11 @@ Each service exposes interactive Swagger UI at `/docs` and ReDoc at `/redoc`. Fo
 | `LLM_PROVIDER` | `openai` | LLM backend: `openai` or `ollama` |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama base URL (used if `LLM_PROVIDER=ollama`) |
 | `OLLAMA_MODEL` | `llama3.2` | Ollama model name |
+| `CONVERSATION_URL` | `http://localhost:8013` | Conversation service base URL |
+| `SLACK_ADAPTER_URL` | `http://localhost:8014` | Slack adapter service base URL |
+| `SLACK_BOT_TOKEN` | — | Slack bot token used by Slack adapter when posting replies |
+| `SLACK_SIGNING_SECRET` | — | Slack request signing secret for webhook verification |
+| `AUTO_EXECUTE_DIRECTIONS` | `true` | Auto-execute direction intents received from Slack |
 | `SAFE_MODE` | `false` | When `true`, actions are logged but not executed |
 | `BLOCK_DANGEROUS_KEYS` | `true` | Block destructive key combinations |
 | `ALLOWED_ACTIONS` | _(all)_ | Comma-separated list of permitted action types |
